@@ -1,0 +1,13 @@
+{
+  "name": "rlbotjavascriptexample",
+  "version": "1.0.0",
+  "description": "An example bot implemented in JavaScript",
+  "main": "main.js",
+  "license": "MIT",
+  "dependencies": {
+    "rlbot-test": "github:SuperVK/RLBotJS"
+  },
+  "devDependencies": {
+    "eslint": "^6.2.0"
+  }
+}
