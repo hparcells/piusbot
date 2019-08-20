@@ -62,7 +62,7 @@ class PiusBot extends BaseAgent {
         // If we are in Q3 or Q4.
         || ballLocation.y < 0 && carLocation.y < 0
       ) {
-        console.log('Correct lineup. Engaging ball.');
+        console.log('PiusBot: Correct lineup.');
         if(botFrontToTargetAngle > 0.1) {
           controller.steer = 1;
           controller.throttle = 0.5;
@@ -73,12 +73,13 @@ class PiusBot extends BaseAgent {
           controller.boost = true;
           controller.throttle = 1;
 
-          if(ballLocation.y - carLocation.y < 200) {
+          if(ballLocation.y - carLocation.y < 350) {
             forwardDodge();
           }
         }
       }else if(ballLocation.x === 0 && ballLocation.y === 0) {
-        console.log('ITS ROBOT FIGHTING TIMEEEEEE!');
+        console.log('PiusBot: ITS ROBOT FIGHTING TIME!');
+
         // eslint-disable-next-line no-lonely-if
         if(botFrontToTargetAngle > 0.1) {
           controller.steer = 1;
@@ -90,7 +91,8 @@ class PiusBot extends BaseAgent {
         controller.boost = true;
         controller.throttle = 1;
       }else {
-        console.log('Incorrect linup.');
+        console.log('PiusBot: Incorrect linup.');
+
         if(ballLocation.y - carLocation.y < 2000) {
           if(ballLocation.x > carLocation.x) {
             if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
@@ -118,22 +120,44 @@ class PiusBot extends BaseAgent {
         controller.throttle = 1;
       }
     }else {
-      console.log('I shouldn\'t be here.');
+      console.log('PiusBot: I shouldn\'t be here.');
 
       if(carLocation.x > 0) {
         if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
           controller.steer = -1;
         }else {
-          controller.boost = true;
+          forwardDodge();
+          if(!dodging && Math.round(carRotation.pitch) === 0) {
+            controller.boost = true;
+          }
         }
       }else if(carLocation.x < 0) {
         if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
           controller.steer = 1;
         }else {
-          controller.boost = true;
+          forwardDodge();
+          if(!dodging && Math.round(carRotation.pitch) === 0) {
+            controller.boost = true;
+          }
         }
       }
       controller.throttle = 1;
+    }
+
+    // If the car falls off a wall or the ceiling.
+    if(Math.round(carLocation.z) > 120) {
+      if(carRotation.roll > 0.5) {
+        controller.roll = -1;
+      }
+      if(carRotation.roll < -0.5) {
+        controller.roll = 1;
+      }
+      if(carRotation.pitch > 0.5) {
+        controller.pitch = -1;
+      }
+      if(carRotation.pitch < -0.5) {
+        controller.pitch = 1;
+      }
     }
 
     return controller;
