@@ -1,5 +1,6 @@
 /* eslint-disable no-lonely-if */
 const { randomOf } = require('@reverse/random');
+const inside = require('point-in-triangle');
 
 const { BaseAgent, SimpleController, Manager } = require('rlbot-test');
 const { Vector3 } = require('rlbot-test').GameStateUtil;
@@ -14,27 +15,41 @@ class PiusBot extends BaseAgent {
     super(name, team, index, fieldInfo);
   }
 
-  
   getOutput(gameTickPacket, ballPrediction) {
+    const teamMultiplier = this.team + this.team - 1;
+
+    const ballLocation = gameTickPacket.ball.physics.location;
+    const carLocation = gameTickPacket.players[this.index].physics.location;
+    const carRotation = gameTickPacket.players[this.index].physics.rotation;
+    
     this.renderer.beginRendering();
     
     // Right goal post.
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(-893, 5120, 17), new this.renderer.Color(0, 0, 255, 0));
-    const rightX = -893 - gameTickPacket.ball.physics.location.x;
-    const rightY = 5120 - gameTickPacket.ball.physics.location.y;
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(-893 * teamMultiplier, 5120 * teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
+    const rightX = -893 * teamMultiplier - gameTickPacket.ball.physics.location.x;
+    const rightY = 5120 * teamMultiplier - gameTickPacket.ball.physics.location.y;
     const rightSlope = rightY / rightX;
-    const rightYIntercept = 5120 - rightSlope * -893;
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(rightSlope > 0 ? -4096 : 4096, rightSlope * (rightSlope > 0 ? -4096 : 4096) + rightYIntercept, 17), new this.renderer.Color(0, 0, 255, 0));
+    const rightYIntercept = 5120 * teamMultiplier - rightSlope * (-893 * teamMultiplier);
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(
+      rightSlope > 0 ? -4096 * teamMultiplier : 4096 * teamMultiplier,
+      rightSlope * (rightSlope > 0 ? -4096 * teamMultiplier : 4096 * teamMultiplier) + rightYIntercept,
+      17
+    ), new this.renderer.Color(0, 0, 255, 0));
     
     // Left goal post.
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(893, 5120, 17), new this.renderer.Color(0, 0, 255, 0));
-    const leftX = 893 - gameTickPacket.ball.physics.location.x;
-    const leftY = 5120 - gameTickPacket.ball.physics.location.y;
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(893 * teamMultiplier, 5120 * teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
+    const leftX = 893 * teamMultiplier - gameTickPacket.ball.physics.location.x;
+    const leftY = 5120 * teamMultiplier - gameTickPacket.ball.physics.location.y;
     const leftSlope = leftY / leftX;
-    console.log(leftSlope)
-    const leftYIntercept = 5120 - leftSlope * 893;
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(leftSlope < 0 ? 4096 : -4096, leftSlope * (leftSlope < 0 ? 4096 : -4096) + leftYIntercept, 17), new this.renderer.Color(0, 0, 255, 0));
+    const leftYIntercept = 5120 * teamMultiplier - leftSlope * (893 * teamMultiplier);
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(
+      leftSlope < 0 ? 4096 * teamMultiplier : -4096 * teamMultiplier,
+      leftSlope * (leftSlope < 0 ? 4096 * teamMultiplier : -4096 * teamMultiplier) + leftYIntercept,
+      17
+    ), new this.renderer.Color(0, 0, 255, 0));
 
+
+    this.renderer.drawString3D(new Vector3(carLocation.x, carLocation.y, carLocation.z + 100), 1, 1, `Position: ${(ballLocation.y - carLocation.y) * teamMultiplier > 0 ? 'Infront' : 'Behind'}`, new this.renderer.Color(255, 0, 255, 0));
 
     this.renderer.endRendering();
         
@@ -67,10 +82,6 @@ class PiusBot extends BaseAgent {
       }
     }
 
-    const ballLocation = gameTickPacket.ball.physics.location;
-    const carLocation = gameTickPacket.players[this.index].physics.location;
-    const carRotation = gameTickPacket.players[this.index].physics.rotation;
-
     const botToTargetAngle = Math.atan2(ballLocation.y - carLocation.y, ballLocation.x - carLocation.x);
     let botFrontToTargetAngle = botToTargetAngle - carRotation.yaw;
 
@@ -78,17 +89,13 @@ class PiusBot extends BaseAgent {
     if (botFrontToTargetAngle < -Math.PI) {botFrontToTargetAngle += 2 * Math.PI;}
     if (botFrontToTargetAngle > Math.PI) {botFrontToTargetAngle -= 2 * Math.PI;}
     
-    if(ballLocation.y > carLocation.y) {
-      // If we have a correct lineup.
-      if(
-        // If we are in Q1.
-        ballLocation.x > 0 && ballLocation.y > 0 && carLocation.x > 0 && ballLocation.y > 0 && ballLocation.x < carLocation.x
-        // If we are in Q2.
-        || ballLocation.x < 0 && ballLocation.y > 0 && carLocation.x < 0 && ballLocation.y > 0 && ballLocation.x > carLocation.x
-        // If we are in Q3 or Q4.
-        || ballLocation.y < 0 && carLocation.y < 0
-      ) {
-        console.log('PiusBot: Correct lineup.');
+    // If we are behind the ball.
+    if(teamMultiplier === -1 && ballLocation.y > carLocation.y || teamMultiplier === 1 && ballLocation.y < carLocation.y) {
+      if(inside([carLocation.x, carLocation.y], [
+        [893 * teamMultiplier, 5120 * teamMultiplier],
+        [-893 * teamMultiplier, 5120 * teamMultiplier],
+        [ballLocation.x, ballLocation.y]
+      ])) {
         if(botFrontToTargetAngle > 0.1) {
           controller.steer = 1;
           controller.throttle = 0.5;
@@ -103,57 +110,31 @@ class PiusBot extends BaseAgent {
             forwardDodge();
           }
         }
-      }else if(ballLocation.x === 0 && ballLocation.y === 0) {
-        // If it's a kickoff.
-        console.log('PiusBot: ITS ROBOT FIGHTING TIME!');
-
-        hasSentQuickChat = false;
-
-        if(botFrontToTargetAngle > 0.1) {
-          controller.steer = 1;
-        }else if(botFrontToTargetAngle < -0.1) {
-          controller.steer = -1;
-        }else if(ballLocation.y - carLocation.y < 550) {
-          forwardDodge();
-        }
-        controller.boost = true;
-        controller.throttle = 1;
       }else {
-        // If we are not in the right position to hit the ball.
-        console.log('PiusBot: Incorrect linup.');
-
-        if(ballLocation.y - carLocation.y < 2000) {
-          // Turn.
-          if(ballLocation.x > carLocation.x) {
-            if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
-              controller.steer = -1;
-            }
-          }else if(ballLocation.x < carLocation.x) {
-            if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
-              controller.steer = 1;
-            }
-          }
-        }else {
-          // Turn to ball.
-          if(botFrontToTargetAngle > 0.1) {
+        // -180
+        console.log(`${this.name}: ${Math.round(carRotation.yaw * (180 / Math.PI))}`);
+        if(carLocation.x * -teamMultiplier > ballLocation.x) {
+          if(Math.round(carRotation.yaw * (180 / Math.PI)) > -180) {
             controller.steer = 1;
-            controller.throttle = 0.5;
-          }else if(botFrontToTargetAngle < -0.1) {
-            controller.steer = -1;
-            controller.throttle = 0.5;
           }else {
             controller.boost = true;
-            controller.throttle = 1;
+          }
+          // 0
+        }else if(carLocation.x * -teamMultiplier < ballLocation.x) {
+          if(Math.round(carRotation.yaw * (180 / Math.PI)) > 0) {
+            controller.steer = -1;
+          }else {
+            controller.boost = true;
           }
         }
-
         controller.throttle = 1;
       }
     }else {
       // If we infront of the ball.
-      console.log('PiusBot: I shouldn\'t be here.');
-      if(carLocation.x > 0) {
-        if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
+      this.renderer.drawString3D(new Vector3(carLocation.x - 200, carLocation.y, carLocation.z + 100), 1, 1, 'Rotating Back.', new this.renderer.Color(255, 0, 255, 0));
+
+      if(carLocation.x * -teamMultiplier > ballLocation.x) {
+        if(Math.round(carRotation.yaw * (180 / Math.PI)) > 80 * teamMultiplier || Math.round(carRotation.yaw * (180 / Math.PI)) < 100 * teamMultiplier) {
           controller.steer = -1;
         }else {
           forwardDodge();
@@ -161,8 +142,8 @@ class PiusBot extends BaseAgent {
             controller.boost = true;
           }
         }
-      }else if(carLocation.x < 0) {
-        if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
+      }else if(carLocation.x * -teamMultiplier < ballLocation.x) {
+        if(Math.round(carRotation.yaw * (180 / Math.PI)) > 80 * teamMultiplier || Math.round(carRotation.yaw * (180 / Math.PI)) < 100 * teamMultiplier) {
           controller.steer = 1;
         }else {
           forwardDodge();
@@ -205,6 +186,8 @@ class PiusBot extends BaseAgent {
         hasSentQuickChat = true;
       }
     }
+
+    this.renderer.endRendering();
 
     return controller;
   }
