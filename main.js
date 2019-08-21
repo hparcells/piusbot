@@ -1,8 +1,10 @@
-const { BaseAgent, SimpleController, quickChats, Manager } = require('rlbot-test');
-const { GameState, BallState, CarState, Physics, Vector3 } = require('rlbot-test').GameStateUtil;
+/* eslint-disable no-lonely-if */
+const { randomOf } = require('@reverse/random');
 
 let dodging = false;
 let dodgingCounter = 0;
+
+let hasSentQuickChat = false;
 
 class PiusBot extends BaseAgent {
   constructor(name, team, index, fieldInfo) {
@@ -10,7 +12,29 @@ class PiusBot extends BaseAgent {
   }
 
   
-  getOutput(gameTickPacket) {
+  getOutput(gameTickPacket, ballPrediction) {
+    this.renderer.beginRendering();
+    
+    // Right goal post.
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(-893, 5120, 17), new this.renderer.Color(0, 0, 255, 0));
+    const rightX = -893 - gameTickPacket.ball.physics.location.x;
+    const rightY = 5120 - gameTickPacket.ball.physics.location.y;
+    const rightSlope = rightY / rightX;
+    const rightYIntercept = 5120 - rightSlope * -893;
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(rightSlope > 0 ? -4096 : 4096, rightSlope * (rightSlope > 0 ? -4096 : 4096) + rightYIntercept, 17), new this.renderer.Color(0, 0, 255, 0));
+    
+    // Left goal post.
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(893, 5120, 17), new this.renderer.Color(0, 0, 255, 0));
+    const leftX = 893 - gameTickPacket.ball.physics.location.x;
+    const leftY = 5120 - gameTickPacket.ball.physics.location.y;
+    const leftSlope = leftY / leftX;
+    console.log(leftSlope)
+    const leftYIntercept = 5120 - leftSlope * 893;
+    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(leftSlope < 0 ? 4096 : -4096, leftSlope * (leftSlope < 0 ? 4096 : -4096) + leftYIntercept, 17), new this.renderer.Color(0, 0, 255, 0));
+
+
+    this.renderer.endRendering();
+        
     const controller = new SimpleController();
 
     // Check if a round is active.
@@ -21,7 +45,6 @@ class PiusBot extends BaseAgent {
     // Helper functions.
     function forwardDodge() {
       dodging = true;
-
       if (dodging) {
         controller.pitch = -1.0;
         if (dodgingCounter < 5) {
@@ -78,9 +101,11 @@ class PiusBot extends BaseAgent {
           }
         }
       }else if(ballLocation.x === 0 && ballLocation.y === 0) {
+        // If it's a kickoff.
         console.log('PiusBot: ITS ROBOT FIGHTING TIME!');
 
-        // eslint-disable-next-line no-lonely-if
+        hasSentQuickChat = false;
+
         if(botFrontToTargetAngle > 0.1) {
           controller.steer = 1;
         }else if(botFrontToTargetAngle < -0.1) {
@@ -91,9 +116,11 @@ class PiusBot extends BaseAgent {
         controller.boost = true;
         controller.throttle = 1;
       }else {
+        // If we are not in the right position to hit the ball.
         console.log('PiusBot: Incorrect linup.');
 
         if(ballLocation.y - carLocation.y < 2000) {
+          // Turn.
           if(ballLocation.x > carLocation.x) {
             if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
               controller.steer = -1;
@@ -104,7 +131,7 @@ class PiusBot extends BaseAgent {
             }
           }
         }else {
-          // eslint-disable-next-line no-lonely-if
+          // Turn to ball.
           if(botFrontToTargetAngle > 0.1) {
             controller.steer = 1;
             controller.throttle = 0.5;
@@ -120,8 +147,8 @@ class PiusBot extends BaseAgent {
         controller.throttle = 1;
       }
     }else {
+      // If we infront of the ball.
       console.log('PiusBot: I shouldn\'t be here.');
-
       if(carLocation.x > 0) {
         if(Math.round(carRotation.yaw * (180 / Math.PI)) > -80 || Math.round(carRotation.yaw * (180 / Math.PI)) < -100) {
           controller.steer = -1;
@@ -145,7 +172,7 @@ class PiusBot extends BaseAgent {
     }
 
     // If the car falls off a wall or the ceiling.
-    if(Math.round(carLocation.z) > 120) {
+    if(Math.round(carLocation.z) > 150) {
       if(carRotation.roll > 0.5) {
         controller.roll = -1;
       }
@@ -157,6 +184,22 @@ class PiusBot extends BaseAgent {
       }
       if(carRotation.pitch < -0.5) {
         controller.pitch = 1;
+      }
+    }
+
+    // If we score.
+    if(ballPrediction.slices[10].physics.location.y > 5120) {
+      if(!hasSentQuickChat) {
+        this.sendQuickChat(randomOf([45, 12, 47]), false);
+        hasSentQuickChat = true;
+      }
+    }
+
+    // If we get scored on.
+    if(ballPrediction.slices[10].physics.location.y < -5120) {
+      if(!hasSentQuickChat) {
+        this.sendQuickChat(randomOf([44, 46, 48]), false);
+        hasSentQuickChat = true;
       }
     }
 

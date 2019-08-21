@@ -5,6 +5,7 @@
   "main": "main.js",
   "license": "MIT",
   "dependencies": {
+    "@reverse/random": "^1.0.9",
     "rlbot-test": "github:SuperVK/RLBotJS"
   },
   "devDependencies": {
