@@ -1,6 +1,9 @@
 /* eslint-disable no-lonely-if */
 const { randomOf } = require('@reverse/random');
 
+const { BaseAgent, SimpleController, Manager } = require('rlbot-test');
+const { Vector3 } = require('rlbot-test').GameStateUtil;
+
 let dodging = false;
 let dodgingCounter = 0;
 
