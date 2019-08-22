@@ -2,8 +2,11 @@
   "name": "rlbotjavascriptexample",
   "version": "1.0.0",
   "description": "An example bot implemented in JavaScript",
-  "main": "main.js",
+  "main": "src/index.js",
   "license": "MIT",
+  "scripts": {
+    "start": "node src/index.js"
+  },
   "dependencies": {
     "@reverse/random": "^1.0.9",
     "point-in-triangle": "^1.0.1",

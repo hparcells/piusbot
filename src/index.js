@@ -5,6 +5,9 @@ const inside = require('point-in-triangle');
 const { BaseAgent, SimpleController, Manager } = require('rlbot-test');
 const { Vector3 } = require('rlbot-test').GameStateUtil;
 
+const { yIntercept, slope, xIntercept } = require('./utils/linear');
+const { clamp } = require('./utils/comparison');
+
 let dodging = false;
 let dodgingCounter = 0;
 
@@ -25,30 +28,47 @@ class PiusBot extends BaseAgent {
     this.renderer.beginRendering();
     
     // Right goal post.
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(-893 * -teamMultiplier, 5120 * -teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
-    const rightX = -893 * -teamMultiplier - gameTickPacket.ball.physics.location.x;
-    const rightY = 5120 * -teamMultiplier - gameTickPacket.ball.physics.location.y;
-    const rightSlope = rightY / rightX;
-    const rightYIntercept = 5120 * -teamMultiplier - rightSlope * (-893 * -teamMultiplier);
-
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(
-      rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier,
-      rightSlope * (rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier) + rightYIntercept,
-      17
-    ), new this.renderer.Color(0, 0, 255, 0));
+    this.renderer.drawLine3D(new Vector3(ballLocation.x, ballLocation.y, 17), new Vector3(-893 * -teamMultiplier, 5120 * -teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
+    const rightX = -893 * -teamMultiplier - ballLocation.x;
+    const rightY = 5120 * -teamMultiplier - ballLocation.y;
+    const rightSlope = slope(rightY, rightX);
+    const rightYIntercept = yIntercept(5120, rightSlope, -893, teamMultiplier);
+    const rightWallIntercept = {
+      x: rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier,
+      y: rightSlope * (rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier) + rightYIntercept
+    };
+    this.renderer.drawLine3D(new Vector3(ballLocation.x, ballLocation.y, 17), new Vector3(rightWallIntercept.x, rightWallIntercept.y, 17), new this.renderer.Color(0, 0, 255, 0));
     
     // Left goal post.
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(893 * -teamMultiplier, 5120 * -teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
-    const leftX = 893 * -teamMultiplier - gameTickPacket.ball.physics.location.x;
-    const leftY = 5120 * -teamMultiplier - gameTickPacket.ball.physics.location.y;
-    const leftSlope = leftY / leftX;
-    const leftYIntercept = 5120 * -teamMultiplier - leftSlope * (893 * -teamMultiplier);
-    this.renderer.drawLine3D(new Vector3(gameTickPacket.ball.physics.location.x, gameTickPacket.ball.physics.location.y, 17), new Vector3(
-      leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier,
-      leftSlope * (leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier) + leftYIntercept,
-      17
-    ), new this.renderer.Color(0, 0, 255, 0));
-        
+    this.renderer.drawLine3D(new Vector3(ballLocation.x, ballLocation.y, 17), new Vector3(893 * -teamMultiplier, 5120 * -teamMultiplier, 17), new this.renderer.Color(0, 255, 0, 0));
+    const leftX = 893 * -teamMultiplier - ballLocation.x;
+    const leftY = 5120 * -teamMultiplier - ballLocation.y;
+    const leftSlope = slope(leftY, leftX);
+    const leftYIntercept = yIntercept(5120, leftSlope, 893, teamMultiplier);
+    const leftWallIntercept = {
+      x: leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier,
+      y: leftSlope * (leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier) + leftYIntercept
+    };
+
+    this.renderer.drawLine3D(new Vector3(ballLocation.x, ballLocation.y, 17), new Vector3(leftWallIntercept.x, leftWallIntercept.y, 17), new this.renderer.Color(0, 0, 255, 0));
+
+    this.renderer.drawLine3D(
+      new Vector3(carLocation.x, carLocation.y, 17),
+      new Vector3(
+        xIntercept(clamp(rightWallIntercept.y, -4096, 4096), rightSlope, rightYIntercept),
+        clamp(rightWallIntercept.y, -5120, 5120),
+        17
+      ), new this.renderer.Color(0, 255, 255, 0)
+    );
+    this.renderer.drawLine3D(
+      new Vector3(carLocation.x, carLocation.y, 17),
+      new Vector3(
+        xIntercept(clamp(leftWallIntercept.y, -4096, 4096), leftSlope, leftYIntercept),
+        clamp(leftWallIntercept.y, -5120, 5120),
+        17
+      ), new this.renderer.Color(0, 255, 255, 0)
+    );
+
     const controller = new SimpleController();
 
     // Check if a round is active.
@@ -81,7 +101,7 @@ class PiusBot extends BaseAgent {
     const botToTargetAngle = Math.atan2(ballLocation.y - carLocation.y, ballLocation.x - carLocation.x);
     let botFrontToTargetAngle = botToTargetAngle - carRotation.yaw;
 
-    // // Correct the angle
+    // Correct the angle
     if (botFrontToTargetAngle < -Math.PI) {botFrontToTargetAngle += 2 * Math.PI;}
     if (botFrontToTargetAngle > Math.PI) {botFrontToTargetAngle -= 2 * Math.PI;}
     
@@ -93,7 +113,7 @@ class PiusBot extends BaseAgent {
         }else if(botFrontToTargetAngle < -0.1) {
           controller.steer = -1;
         }else {
-          if(Math.max(ballLocation.y, carLocation.y) - Math.min(ballLocation.y, carLocation.y) < 350) {
+          if(Math.abs(ballLocation.y - carLocation.y) < 350) {
             forwardDodge();
           }
         }
@@ -101,8 +121,8 @@ class PiusBot extends BaseAgent {
         controller.boost = true;
       }else if(inside([carLocation.x, carLocation.y], [
         [ballLocation.x, ballLocation.y],
-        [rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier, rightSlope * (rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier) + rightYIntercept],
-        [leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier, leftSlope * (leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier) + leftYIntercept]
+        [rightWallIntercept.x, rightWallIntercept.y],
+        [leftWallIntercept.x, leftWallIntercept.y]
       ])) {
         if(botFrontToTargetAngle > 0.1) {
           controller.steer = 1;
@@ -114,21 +134,20 @@ class PiusBot extends BaseAgent {
           controller.boost = true;
           controller.throttle = 1;
 
-          if(Math.max(ballLocation.y, carLocation.y) - Math.min(ballLocation.y, carLocation.y) < 350) {
+          if(Math.abs(ballLocation.y - carLocation.y) < 350) {
             forwardDodge();
           }
         }
       }else {
-        // 5120 = slope x + y intercept
         const centerX = (
           ballLocation.x
-          + (rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier)
-          + (leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier)
+          + xIntercept(clamp(rightWallIntercept.y, -4096, 4096), rightSlope, rightYIntercept)
+          +  xIntercept(clamp(leftWallIntercept.y, -4096, 4096), leftSlope, leftYIntercept)
         ) / 3;
         const centerY = (
           ballLocation.y
-          + Math.min(Math.max(rightSlope * (rightSlope > 0 ? -4096 * -teamMultiplier : (rightSlope > 0 ? -4096 * -teamMultiplier : 4096 * -teamMultiplier) * -teamMultiplier) + rightYIntercept, -5120), 5120)
-          + Math.min(Math.max(leftSlope * (leftSlope < 0 ? 4096 * -teamMultiplier : -4096 * -teamMultiplier) + leftYIntercept, -5120), 5120)
+          + clamp(rightWallIntercept.y, -5120, 5120)
+          + clamp(leftWallIntercept.y, -5120, 5120)
         ) / 3;
 
         const botToTargetConeAngle = Math.atan2(centerY - carLocation.y, centerX - carLocation.x);
